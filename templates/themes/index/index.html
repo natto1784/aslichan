@@ -27,7 +27,7 @@
 			{% for board in boards %}
 				<li class="boardlinksurl">
 					<a href="{{ config.board_path|sprintf(board.uri) }}">
-						{{ board.title|e }}
+					 /{{ board.uri }}/	- {{ board.title|e }}
 					</a>
 				</li>
 			{% endfor %}
@@ -106,6 +106,9 @@
 		<br>Tinyboard Copyright &copy; 2010-2014 Tinyboard Development Group    
 		<br><a href="https://engine.vichan.net/">vichan</a> Copyright &copy; 2012-2018 vichan-devel
 	</footer>
+	<script type="text/javascript">{% verbatim %}
+		ready();
+	{% endverbatim %}</script>
 </body>
 </html>
 {% endfilter %}
