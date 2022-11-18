@@ -46,8 +46,8 @@ function loadConfig() {
 
 	$boardsuffix = isset($board['uri']) ? $board['uri'] : '';
 
-	if (!isset($_SERVER['REMOTE_ADDR']))
-		$_SERVER['REMOTE_ADDR'] = '0.0.0.0';
+	if (!isset($_SERVER['HTTP_X_REAL_IP']))
+		$_SERVER['HTTP_X_REAL_IP'] = '0.0.0.0';
 
 	if (file_exists('tmp/cache/cache_config.php')) {
 		require_once('tmp/cache/cache_config.php');
@@ -257,11 +257,11 @@ function loadConfig() {
 
 	// Keep the original address to properly comply with other board configurations
 	if (!isset($__ip))
-		$__ip = $_SERVER['REMOTE_ADDR'];
+		$__ip = $_SERVER['HTTP_X_REAL_IP'];
 
 	// ::ffff:0.0.0.0
 	if (preg_match('/^\:\:(ffff\:)?(\d+\.\d+\.\d+\.\d+)$/', $__ip, $m))
-		$_SERVER['REMOTE_ADDR'] = $m[2];
+		$_SERVER['HTTP_X_REAL_IP'] = $m[2];
 
 	if ($config['verbose_errors']) {
 		set_error_handler('verbose_error_handler');
@@ -354,9 +354,9 @@ function fatal_error_handler() {
 }
 
 function _syslog($priority, $message) {
-	if (isset($_SERVER['REMOTE_ADDR'], $_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI'])) {
+	if (isset($_SERVER['HTTP_X_REAL_IP'], $_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI'])) {
 		// CGI
-		syslog($priority, $message . ' - client: ' . $_SERVER['REMOTE_ADDR'] . ', request: "' . $_SERVER['REQUEST_METHOD'] . ' ' . $_SERVER['REQUEST_URI'] . '"');
+		syslog($priority, $message . ' - client: ' . $_SERVER['HTTP_X_REAL_IP'] . ', request: "' . $_SERVER['REQUEST_METHOD'] . ' ' . $_SERVER['REQUEST_URI'] . '"');
 	} else {
 		syslog($priority, $message);
 	}
@@ -844,7 +844,7 @@ function displayBan($ban) {
 		Bans::seen($ban['id']);
 	}
 
-	$ban['ip'] = $_SERVER['REMOTE_ADDR'];
+	$ban['ip'] = $_SERVER['HTTP_X_REAL_IP'];
 
 	if ($ban['post'] && isset($ban['post']['board'], $ban['post']['id'])) {
 		if (openBoard($ban['post']['board'])) {
@@ -896,7 +896,7 @@ function displayBan($ban) {
 function checkBan($board = false) {
 	global $config;
 
-	if (!isset($_SERVER['REMOTE_ADDR'])) {
+	if (!isset($_SERVER['HTTP_X_REAL_IP'])) {
 		// Server misconfiguration
 		return;
 	}		
@@ -906,7 +906,7 @@ function checkBan($board = false) {
 
 	$ips = array();
 
-	$ips[] = $_SERVER['REMOTE_ADDR'];
+	$ips[] = $_SERVER['HTTP_X_REAL_IP'];
 
 	if ($config['proxy_check'] && isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
 		$ips = array_merge($ips, explode(", ", $_SERVER['HTTP_X_FORWARDED_FOR']));
@@ -1004,7 +1004,7 @@ function insertFloodPost(array $post) {
 	global $board;
 	
 	$query = prepare("INSERT INTO ``flood`` VALUES (NULL, :ip, :board, :time, :posthash, :filehash, :isreply)");
-	$query->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
+	$query->bindValue(':ip', $_SERVER['HTTP_X_REAL_IP']);
 	$query->bindValue(':board', $board['uri']);
 	$query->bindValue(':time', time());
 	$query->bindValue(':posthash', make_comment_hex($post['body_nomarkup']));
@@ -1044,7 +1044,7 @@ function post(array $post) {
 	$query->bindValue(':body_nomarkup', $post['body_nomarkup']);
 	$query->bindValue(':time', isset($post['time']) ? $post['time'] : time(), PDO::PARAM_INT);
 	$query->bindValue(':password', $post['password']);		
-	$query->bindValue(':ip', isset($post['ip']) ? $post['ip'] : $_SERVER['REMOTE_ADDR']);
+	$query->bindValue(':ip', isset($post['ip']) ? $post['ip'] : $_SERVER['HTTP_X_REAL_IP']);
 
 	if ($post['op'] && $post['mod'] && isset($post['sticky']) && $post['sticky']) {
 		$query->bindValue(':sticky', true, PDO::PARAM_INT);
@@ -1595,7 +1595,7 @@ function muteTime() {
 	// Find number of mutes in the past X hours
 	$query = prepare("SELECT COUNT(*) FROM ``mutes`` WHERE `time` >= :time AND `ip` = :ip");
 	$query->bindValue(':time', time()-($config['robot_mute_hour']*3600), PDO::PARAM_INT);
-	$query->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
+	$query->bindValue(':ip', $_SERVER['HTTP_X_REAL_IP']);
 	$query->execute() or error(db_error($query));
 
 	if (!$result = $query->fetchColumn())
@@ -1607,7 +1607,7 @@ function mute() {
 	// Insert mute
 	$query = prepare("INSERT INTO ``mutes`` VALUES (:ip, :time)");
 	$query->bindValue(':time', time(), PDO::PARAM_INT);
-	$query->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
+	$query->bindValue(':ip', $_SERVER['HTTP_X_REAL_IP']);
 	$query->execute() or error(db_error($query));
 
 	return muteTime();
@@ -1618,7 +1618,7 @@ function checkMute() {
 
 	if ($config['cache']['enabled']) {
 		// Cached mute?
-		if (($mute = cache::get("mute_${_SERVER['REMOTE_ADDR']}")) && ($mutetime = cache::get("mutetime_${_SERVER['REMOTE_ADDR']}"))) {
+		if (($mute = cache::get("mute_${_SERVER['HTTP_X_REAL_IP']}")) && ($mutetime = cache::get("mutetime_${_SERVER['HTTP_X_REAL_IP']}"))) {
 			error(sprintf($config['error']['youaremuted'], $mute['time'] + $mutetime - time()));
 		}
 	}
@@ -1627,7 +1627,7 @@ function checkMute() {
 	if ($mutetime > 0) {
 		// Find last mute time
 		$query = prepare("SELECT `time` FROM ``mutes`` WHERE `ip` = :ip ORDER BY `time` DESC LIMIT 1");
-		$query->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
+		$query->bindValue(':ip', $_SERVER['HTTP_X_REAL_IP']);
 		$query->execute() or error(db_error($query));
 
 		if (!$mute = $query->fetch(PDO::FETCH_ASSOC)) {
@@ -1637,8 +1637,8 @@ function checkMute() {
 
 		if ($mute['time'] + $mutetime > time()) {
 			if ($config['cache']['enabled']) {
-				cache::set("mute_${_SERVER['REMOTE_ADDR']}", $mute, $mute['time'] + $mutetime - time());
-				cache::set("mutetime_${_SERVER['REMOTE_ADDR']}", $mutetime, $mute['time'] + $mutetime - time());
+				cache::set("mute_${_SERVER['HTTP_X_REAL_IP']}", $mute, $mute['time'] + $mutetime - time());
+				cache::set("mutetime_${_SERVER['HTTP_X_REAL_IP']}", $mutetime, $mute['time'] + $mutetime - time());
 			}
 			// Not expired yet
 			error(sprintf($config['error']['youaremuted'], $mute['time'] + $mutetime - time()));
@@ -1879,16 +1879,16 @@ function checkDNSBL() {
 	if (isIPv6())
 		return; // No IPv6 support yet.
 
-	if (!isset($_SERVER['REMOTE_ADDR']))
+	if (!isset($_SERVER['HTTP_X_REAL_IP']))
 		return; // Fix your web server configuration
 
-	if (preg_match("/^(::(ffff:)?)?(127\.|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|0\.|255\.)/", $_SERVER['REMOTE_ADDR']))
+	if (preg_match("/^(::(ffff:)?)?(127\.|192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.|0\.|255\.)/", $_SERVER['HTTP_X_REAL_IP']))
 		return; // It's pointless to check for local IP addresses in dnsbls, isn't it?
 
-	if (in_array($_SERVER['REMOTE_ADDR'], $config['dnsbl_exceptions']))
+	if (in_array($_SERVER['HTTP_X_REAL_IP'], $config['dnsbl_exceptions']))
 		return;
 
-	$ipaddr = ReverseIPOctets($_SERVER['REMOTE_ADDR']);
+	$ipaddr = ReverseIPOctets($_SERVER['HTTP_X_REAL_IP']);
 
 	foreach ($config['dnsbl'] as $blacklist) {
 		if (!is_array($blacklist))
@@ -1921,7 +1921,7 @@ function checkDNSBL() {
 }
 
 function isIPv6() {
-	return strstr($_SERVER['REMOTE_ADDR'], ':') !== false;
+	return strstr($_SERVER['HTTP_X_REAL_IP'], ':') !== false;
 }
 
 function ReverseIPOctets($ip) {

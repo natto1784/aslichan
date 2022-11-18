@@ -9,8 +9,8 @@ $dropped_post = false;
 
 // Is it a post coming from NNTP? Let's extract it and pretend it's a normal post.
 if (isset($_GET['Newsgroups']) && $config['nntpchan']['enabled']) {
-	if ($_SERVER['REMOTE_ADDR'] != $config['nntpchan']['trusted_peer']) {
-		error("NNTPChan: Forbidden. $_SERVER[REMOTE_ADDR] is not a trusted peer");
+	if ($_SERVER['HTTP_X_REAL_IP'] != $config['nntpchan']['trusted_peer']) {
+		error("NNTPChan: Forbidden. $_SERVER[HTTP_X_REAL_IP] is not a trusted peer");
 	}
 
 	$_POST = array();
@@ -327,7 +327,7 @@ if (isset($_POST['delete'])) {
 		
 		$post = $query->fetch(PDO::FETCH_ASSOC);
 		
-	        $error = event('report', array('ip' => $_SERVER['REMOTE_ADDR'], 'board' => $board['uri'], 'post' => $post, 'reason' => $reason, 'link' => link_for($post)));
+	        $error = event('report', array('ip' => $_SERVER['HTTP_X_REAL_IP'], 'board' => $board['uri'], 'post' => $post, 'reason' => $reason, 'link' => link_for($post)));
 
 	        if ($error) {
 	                error($error);
@@ -340,7 +340,7 @@ if (isset($_POST['delete'])) {
 			);
 		$query = prepare("INSERT INTO ``reports`` VALUES (NULL, :time, :ip, :board, :post, :reason)");
 		$query->bindValue(':time', time(), PDO::PARAM_INT);
-		$query->bindValue(':ip', $_SERVER['REMOTE_ADDR'], PDO::PARAM_STR);
+		$query->bindValue(':ip', $_SERVER['HTTP_X_REAL_IP'], PDO::PARAM_STR);
 		$query->bindValue(':board', $board['uri'], PDO::PARAM_STR);
 		$query->bindValue(':post', $id, PDO::PARAM_INT);
 		$query->bindValue(':reason', $reason, PDO::PARAM_STR);
@@ -404,7 +404,7 @@ if (isset($_POST['delete'])) {
 			$resp = json_decode(file_get_contents(sprintf('https://www.recaptcha.net/recaptcha/api/siteverify?secret=%s&response=%s&remoteip=%s',
 				$config['recaptcha_private'],
 				urlencode($_POST['g-recaptcha-response']),
-				$_SERVER['REMOTE_ADDR'])), true);
+				$_SERVER['HTTP_X_REAL_IP'])), true);
 
 			if (!$resp['success']) {
 				error($config['error']['captcha']);
@@ -743,7 +743,7 @@ if (isset($_POST['delete'])) {
 	
 	if (!$dropped_post)
 	if (($config['country_flags'] && !$config['allow_no_country']) || ($config['country_flags'] && $config['allow_no_country'] && !isset($_POST['no_country']))) {
-		$gi=geoip_open('inc/lib/geoip/GeoIPv6.dat', GEOIP_STANDARD);
+    $gi=geoip_open('inc/lib/geoip/GeoIPv6.dat', GEOIP_STANDARD);
 
 		function ipv4to6($ip) {
 			if (strpos($ip, ':') !== false) {
@@ -755,12 +755,11 @@ if (isset($_POST['delete'])) {
 			$part7 = base_convert(($iparr[0] * 256) + $iparr[1], 10, 16);
 			$part8 = base_convert(($iparr[2] * 256) + $iparr[3], 10, 16);
 			return '::ffff:'.$part7.':'.$part8;
-		}
-	
-		if ($country_code = geoip_country_code_by_addr_v6($gi, ipv4to6($_SERVER['REMOTE_ADDR']))) {
+    }
+		if ($country_code = geoip_country_code_by_addr_v6($gi, ipv4to6($_SERVER['HTTP_X_REAL_IP']))) {
 			if (!in_array(strtolower($country_code), array('eu', 'ap', 'o1', 'a1', 'a2')))
 				$post['body'] .= "\n<tinyboard flag>".strtolower($country_code)."</tinyboard>".
-				"\n<tinyboard flag alt>".geoip_country_name_by_addr_v6($gi, ipv4to6($_SERVER['REMOTE_ADDR']))."</tinyboard>";
+        "\n<tinyboard flag alt>".geoip_country_name_by_addr_v6($gi, ipv4to6($_SERVER['HTTP_X_REAL_IP']))."</tinyboard>";
 		}
 	}
 
@@ -783,8 +782,8 @@ if (isset($_POST['delete'])) {
 	}
 
 	if (!$dropped_post)
-        if ($config['proxy_save'] && isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-		$proxy = preg_replace("/[^0-9a-fA-F.,: ]/", '', $_SERVER['HTTP_X_FORWARDED_FOR']);
+  if ($config['proxy_save'] && isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+    $proxy = preg_replace("/[^0-9a-fA-F.,: ]/", '', $_SERVER['HTTP_X_FORWARDED_FOR']);
 		$post['body'] .= "\n<tinyboard proxy>".$proxy."</tinyboard>";
 	}
 	
@@ -1215,8 +1214,8 @@ if (isset($_POST['delete'])) {
 	if (!$post['mod']) header('X-Associated-Content: "' . $redirect . '"');
 
 	// Any telegrams to show?
-	$query = prepare('SELECT * FROM ``telegrams`` WHERE ``ip`` = :ip AND ``seen`` = 0');
-	$query->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
+  $query = prepare('SELECT * FROM ``telegrams`` WHERE ``ip`` = :ip AND ``seen`` = 0');
+	$query->bindValue(':ip', $_SERVER['HTTP_X_REAL_IP']);
 	$query->execute() or error(db_error($query));
 	$telegrams = $query->fetchAll(PDO::FETCH_ASSOC);
 
@@ -1275,7 +1274,7 @@ if (isset($_POST['delete'])) {
 	
 	$ban_id = (int)$_POST['ban_id'];
 	
-	$bans = Bans::find($_SERVER['REMOTE_ADDR']);
+	$bans = Bans::find($_SERVER['HTTP_X_REAL_IP']);
 	foreach ($bans as $_ban) {
 		if ($_ban['id'] == $ban_id) {
 			$ban = $_ban;

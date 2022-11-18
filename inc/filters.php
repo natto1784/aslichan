@@ -38,7 +38,7 @@ class Filter {
 					foreach ($match as $flood_match_arg) {
 						switch ($flood_match_arg) {
 							case 'ip':
-								if ($flood_post['ip'] != $_SERVER['REMOTE_ADDR'])
+								if ($flood_post['ip'] != $_SERVER['HTTP_X_REAL_IP'])
 									continue 3;
 								break;
 							case 'body':
@@ -117,7 +117,7 @@ class Filter {
 				}
 				return false;
 			case 'ip':
-				return preg_match($match, $_SERVER['REMOTE_ADDR']);
+				return preg_match($match, $_SERVER['HTTP_X_REAL_IP']);
 			case 'op':
 				return $post['op'] == $match;
 			case 'has_file':
@@ -137,7 +137,7 @@ class Filter {
 		$this->add_note = isset($this->add_note) ? $this->add_note : false;
 		if ($this->add_note) {
 			$query = prepare('INSERT INTO ``ip_notes`` VALUES (NULL, :ip, :mod, :time, :body)');
-	                $query->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
+	                $query->bindValue(':ip', $_SERVER['HTTP_X_REAL_IP']);
         	        $query->bindValue(':mod', -1);
 	                $query->bindValue(':time', time());
 	                $query->bindValue(':body', "Autoban message: ".$this->post['body']);
@@ -154,7 +154,7 @@ class Filter {
 				$this->reject = isset($this->reject) ? $this->reject : true;
 				$this->all_boards = isset($this->all_boards) ? $this->all_boards : false;
 				
-				Bans::new_ban($_SERVER['REMOTE_ADDR'], $this->reason, $this->expires, $this->all_boards ? false : $board['uri'], -1);
+				Bans::new_ban($_SERVER['HTTP_X_REAL_IP'], $this->reason, $this->expires, $this->all_boards ? false : $board['uri'], -1);
 
 				if ($this->reject) {
 					if (isset($this->message))
@@ -223,12 +223,12 @@ function do_filters(array $post) {
 	if (isset($has_flood)) {
 		if ($post['has_file']) {
 			$query = prepare("SELECT * FROM ``flood`` WHERE `ip` = :ip OR `posthash` = :posthash OR `filehash` = :filehash");
-			$query->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
+			$query->bindValue(':ip', $_SERVER['HTTP_X_REAL_IP']);
 			$query->bindValue(':posthash', make_comment_hex($post['body_nomarkup']));
 			$query->bindValue(':filehash', $post['filehash']);
 		} else {
 			$query = prepare("SELECT * FROM ``flood`` WHERE `ip` = :ip OR `posthash` = :posthash");
-			$query->bindValue(':ip', $_SERVER['REMOTE_ADDR']);
+			$query->bindValue(':ip', $_SERVER['HTTP_X_REAL_IP']);
 			$query->bindValue(':posthash', make_comment_hex($post['body_nomarkup']));
 		}
 		$query->execute() or error(db_error($query));
